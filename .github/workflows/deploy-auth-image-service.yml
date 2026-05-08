@@ -1,0 +1,70 @@
+name: Deploy auth-image-service to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/auth-image-service/**'
+      - '.github/workflows/deploy-auth-image-service.yml'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: auth-image-service
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/auth-image-service
+          file: ./services/auth-image-service/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Configure App Service environment variables
+        uses: azure/appservice-settings@v1
+        with:
+          app-name: ${{ secrets.APP_AUTH_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_AUTH }}
+          app-settings-json: |
+            [
+              { "name": "WEBSITES_PORT",                            "value": "8080",                                                              "slotSetting": false },
+              { "name": "PORT",                                     "value": "8080",                                                              "slotSetting": false },
+              { "name": "NODE_ENV",                                 "value": "production",                                                        "slotSetting": false },
+              { "name": "JWT_SECRET",                               "value": "${{ secrets.JWT_SECRET }}",                                          "slotSetting": false },
+              { "name": "JWT_EXPIRES_IN",                           "value": "24h",                                                                "slotSetting": false },
+              { "name": "STORAGE_MODE",                             "value": "azure",                                                              "slotSetting": false },
+              { "name": "AZURE_STORAGE_CONNECTION_STRING",          "value": "${{ secrets.STORAGE_CONN }}",                                        "slotSetting": false },
+              { "name": "AZURE_STORAGE_CONTAINER_NAME",             "value": "photos",                                                             "slotSetting": false },
+              { "name": "DB_MODE",                                  "value": "cosmos",                                                             "slotSetting": false },
+              { "name": "COSMOS_ENDPOINT",                          "value": "${{ secrets.COSMOS_ENDPOINT }}",                                     "slotSetting": false },
+              { "name": "COSMOS_KEY",                               "value": "${{ secrets.COSMOS_KEY }}",                                          "slotSetting": false },
+              { "name": "COSMOS_DATABASE",                          "value": "photoshare",                                                         "slotSetting": false },
+              { "name": "AI_VISION_ENDPOINT",                       "value": "${{ secrets.VISION_ENDPOINT }}",                                     "slotSetting": false },
+              { "name": "AI_VISION_KEY",                            "value": "${{ secrets.VISION_KEY }}",                                          "slotSetting": false },
+              { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",    "value": "${{ secrets.APPI_CONN }}",                                           "slotSetting": false },
+              { "name": "CORS_ORIGIN",                              "value": "*",                                                                  "slotSetting": false }
+            ]
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.APP_AUTH_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_AUTH }}
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
