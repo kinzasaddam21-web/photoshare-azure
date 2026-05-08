@@ -1,0 +1,131 @@
+version: "3.9"
+
+# Shared JWT secret across services so tokens issued by auth-image-service
+# are accepted by interaction-search-service.
+x-jwt-secret: &jwt_secret ${JWT_SECRET:-dev-jwt-secret-change-me-in-production-please}
+
+services:
+  # -------------------------------------------------------
+  # Microservice 1: Authentication + Image upload/retrieval
+  # -------------------------------------------------------
+  auth-image-service:
+    build:
+      context: ./services/auth-image-service
+      dockerfile: Dockerfile
+    container_name: photoshare-auth-image
+    ports:
+      - "8001:8080"
+    environment:
+      PORT: 8080
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_SECRET: *jwt_secret
+      JWT_EXPIRES_IN: 24h
+      # Storage: 'local' uses ./uploads, 'azure' uses Azure Blob Storage
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      LOCAL_UPLOAD_DIR: /app/uploads
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-photos}
+      # Database: 'sqlite' or 'cosmos'
+      DB_MODE: ${DB_MODE:-sqlite}
+      SQLITE_PATH: /app/data/app.db
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT:-}
+      COSMOS_KEY: ${COSMOS_KEY:-}
+      COSMOS_DATABASE: ${COSMOS_DATABASE:-photoshare}
+      COSMOS_CONTAINER_USERS: users
+      COSMOS_CONTAINER_IMAGES: images
+      # AI Vision (optional)
+      AI_VISION_ENDPOINT: ${AI_VISION_ENDPOINT:-}
+      AI_VISION_KEY: ${AI_VISION_KEY:-}
+      # App Insights (optional)
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING:-}
+      # CORS — allow frontend
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8001}
+    volumes:
+      - auth_image_data:/app/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - photoshare-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # -------------------------------------------------------
+  # Microservice 2: Comments, ratings, multi-field search
+  # -------------------------------------------------------
+  interaction-search-service:
+    build:
+      context: ./services/interaction-search-service
+      dockerfile: Dockerfile
+    container_name: photoshare-interaction-search
+    ports:
+      - "8002:8080"
+    environment:
+      PORT: 8080
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_SECRET: *jwt_secret
+      DB_MODE: ${DB_MODE:-sqlite}
+      SQLITE_PATH: /app/data/interactions.db
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT:-}
+      COSMOS_KEY: ${COSMOS_KEY:-}
+      COSMOS_DATABASE: ${COSMOS_DATABASE:-photoshare}
+      COSMOS_CONTAINER_COMMENTS: comments
+      COSMOS_CONTAINER_RATINGS: ratings
+      COSMOS_CONTAINER_IMAGES: images
+      # Azure AI Search (optional advanced feature)
+      SEARCH_MODE: ${SEARCH_MODE:-local}
+      AZURE_SEARCH_ENDPOINT: ${AZURE_SEARCH_ENDPOINT:-}
+      AZURE_SEARCH_KEY: ${AZURE_SEARCH_KEY:-}
+      AZURE_SEARCH_INDEX: ${AZURE_SEARCH_INDEX:-images-index}
+      # Cross-service URL (used in sqlite mode for local search hydration)
+      AUTH_IMAGE_SERVICE_URL: http://auth-image-service:8080
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    volumes:
+      - interaction_search_data:/app/data
+    depends_on:
+      auth-image-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - photoshare-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # -------------------------------------------------------
+  # Frontend (React → nginx static)
+  # -------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_AUTH_API: ${PUBLIC_AUTH_API:-http://localhost:8001}
+        REACT_APP_INTERACTION_API: ${PUBLIC_INTERACTION_API:-http://localhost:8002}
+    container_name: photoshare-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      auth-image-service:
+        condition: service_healthy
+      interaction-search-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - photoshare-net
+
+networks:
+  photoshare-net:
+    driver: bridge
+
+volumes:
+  auth_image_data:
+  interaction_search_data:
