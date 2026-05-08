@@ -12,7 +12,7 @@ env:
   IMAGE_NAME: interaction-search-service
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,9 +37,8 @@ jobs:
             ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.APP_INT_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_INT }}
-          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+      - name: Done
+        run: |
+          echo "✅ Image pushed to ACR"
+          echo "App Service will auto-pull and deploy via continuous deployment"
+          echo "Site: https://${{ secrets.APP_INT_NAME }}.azurewebsites.net"
