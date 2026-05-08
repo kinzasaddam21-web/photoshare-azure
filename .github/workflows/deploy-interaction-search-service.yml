@@ -37,26 +37,6 @@ jobs:
             ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Configure App Service environment variables
-        uses: azure/appservice-settings@v1
-        with:
-          app-name: ${{ secrets.APP_INT_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_INT }}
-          app-settings-json: |
-            [
-              { "name": "WEBSITES_PORT",                            "value": "8080",                                                              "slotSetting": false },
-              { "name": "PORT",                                     "value": "8080",                                                              "slotSetting": false },
-              { "name": "NODE_ENV",                                 "value": "production",                                                        "slotSetting": false },
-              { "name": "JWT_SECRET",                               "value": "${{ secrets.JWT_SECRET }}",                                          "slotSetting": false },
-              { "name": "DB_MODE",                                  "value": "cosmos",                                                             "slotSetting": false },
-              { "name": "COSMOS_ENDPOINT",                          "value": "${{ secrets.COSMOS_ENDPOINT }}",                                     "slotSetting": false },
-              { "name": "COSMOS_KEY",                               "value": "${{ secrets.COSMOS_KEY }}",                                          "slotSetting": false },
-              { "name": "COSMOS_DATABASE",                          "value": "photoshare",                                                         "slotSetting": false },
-              { "name": "SEARCH_MODE",                              "value": "local",                                                              "slotSetting": false },
-              { "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",    "value": "${{ secrets.APPI_CONN }}",                                           "slotSetting": false },
-              { "name": "CORS_ORIGIN",                              "value": "*",                                                                  "slotSetting": false }
-            ]
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
