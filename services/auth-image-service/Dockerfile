@@ -1,13 +1,8 @@
 # ---- Build stage ----
 FROM node:20-alpine AS build
 WORKDIR /app
-
-# Install build deps for better-sqlite3 (native module)
-RUN apk add --no-cache python3 make g++
-
 COPY package*.json ./
 RUN npm install --omit=dev
-
 COPY src ./src
 
 # ---- Runtime stage ----
@@ -21,16 +16,14 @@ COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/package.json ./package.json
 COPY --from=build --chown=app:app /app/src ./src
 
-# Create writable dirs for sqlite + local uploads
+# Create writable dirs
 RUN mkdir -p /app/data /app/uploads && chown -R app:app /app/data /app/uploads
 
 USER app
 
 ENV NODE_ENV=production
 ENV PORT=8080
-EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+EXPOSE 8080
 
 CMD ["node", "src/index.js"]
