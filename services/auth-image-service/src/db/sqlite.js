@@ -1,4 +1,3 @@
-const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
@@ -11,7 +10,8 @@ function init() {
   const dir = path.dirname(config.db.sqlitePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  db = new Database(config.db.sqlitePath);
+  const Database = require('better-sqlite3');
+   db = new Database(config.db.sqlitePath);
   db.pragma('journal_mode = WAL');
 
   db.exec(`
