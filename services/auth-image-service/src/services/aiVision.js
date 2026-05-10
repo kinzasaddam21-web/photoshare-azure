@@ -9,7 +9,7 @@ async function analyzeImage(imageBuffer) {
 
   try {
     // Use Image Analysis 4.0 REST endpoint with native fetch
-    const url = `${config.aiVision.endpoint.replace(/\/$/, '')}/computervision/imageanalysis:analyze?api-version=2024-02-01&features=tags,caption&language=en`;
+    const url = `${config.aiVision.endpoint.replace(/\/$/, '')}/computervision/imageanalysis:analyze?api-version=2024-02-01&features=tags&language=en`;
 
     const response = await fetch(url, {
       method: 'POST',
