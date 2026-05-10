@@ -110,7 +110,7 @@ async function getRatingSummary(image_id) {
 async function getUserRating(image_id, user_id) {
   const { resources } = await ratingsContainer.items
     .query({
-      query: 'SELECT c.value FROM c WHERE c.image_id = @img AND c.user_id = @uid',
+      query: 'SELECT * FROM c WHERE c.image_id = @img AND c.user_id = @uid',
       parameters: [
         { name: '@img', value: image_id },
         { name: '@uid', value: user_id },
