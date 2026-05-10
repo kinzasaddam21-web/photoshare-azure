@@ -93,15 +93,17 @@ async function upsertRating({ image_id, user_id, value }) {
 async function getRatingSummary(image_id) {
   const { resources } = await ratingsContainer.items
     .query({
-      query:
-        'SELECT VALUE { count: COUNT(1), avg: AVG(c.value) } FROM c WHERE c.image_id = @id',
+      query: 'SELECT * FROM c WHERE c.image_id = @id',
       parameters: [{ name: '@id', value: image_id }],
     })
     .fetchAll();
-  const r = resources[0] || { count: 0, avg: 0 };
+
+  const count = resources.length;
+  if (count === 0) return { count: 0, average: 0 };
+  const sum = resources.reduce((acc, r) => acc + (r.value || 0), 0);
   return {
-    count: r.count || 0,
-    average: r.avg ? Math.round(r.avg * 10) / 10 : 0,
+    count,
+    average: Math.round((sum / count) * 10) / 10,
   };
 }
 
